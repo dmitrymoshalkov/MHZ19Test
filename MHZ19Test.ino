@@ -18,14 +18,14 @@
 
 #define SKETCH_NAME "CO2 meter"
 #define SKETCH_MAJOR_VER "1"
-#define SKETCH_MINOR_VER "0"
+#define SKETCH_MINOR_VER "13"
 
 
 
 /*****************************************************************************************************/
 /*                               				Common settings									      */
 /******************************************************************************************************/
-#define RADIO_RESET_DELAY_TIME 30 //Задержка между сообщениями
+#define RADIO_RESET_DELAY_TIME 40 //Задержка между сообщениями
 #define MESSAGE_ACK_RETRY_COUNT 2  //количество попыток отсылки сообщения с запросом подтверждения
 #define DATASEND_DELAY  10
 
@@ -42,6 +42,9 @@ unsigned long ulLastReceivedMills2 = 1;
 #define ALARMBEEPFREQ 1500 // in ms
 
 #define SENSORHEATTIME 120 //in seconds
+
+#define CRCCONTINOUSERRORS	5
+
 
 #define CHILD_ID_CO2 0
 #define REBOOT_CHILD_ID 100
@@ -90,7 +93,10 @@ typedef struct {
 	byte    MeasurementRange;	 //0 - 2000ppm, 1 - 5000ppm
 	byte 	buzzerState; //0 - off, 1 - on
 	byte    nightMode; //0 - off, 1 - on
+	byte    shortRestart = 0;
 } sensor_config;
+
+bool bCRCcontErrors = 0;
 
 
 sensor_config configSettings;
@@ -118,13 +124,7 @@ EEPROM_writeAnything(0, configSettings);
 
 EEPROM_readAnything(0, configSettings);
 
-//wait(100);
 
-
-//Serial.println("configSettings.ABCstate: " + String(configSettings.ABCstate) );
-//Serial.println("configSettings.MeasurementRange: " + String(configSettings.MeasurementRange) );
-//Serial.println("configSettings.buzzerState: " + String(configSettings.buzzerState) );
-//Serial.println("configSettings.nightMode: " + String(configSettings.nightMode) );
 
 switch (configSettings.buzzerState) {
   case 0:
@@ -162,17 +162,12 @@ switch (configSettings.ABCstate) {
 
 
 
-drawNetStartMenu(0);
+if (configSettings.shortRestart != 1)
+{
+	drawNetStartMenu(0);
+}
 
 
-
-
-//Serial.println("Speaker state: " + String(bSpeakerOff) );
-
-//  for(int i = 0;i < 5;i++) {
-//    tone(5,1000,5);
-//    delay(1000);
-//  }
 
 
 }
@@ -180,42 +175,116 @@ drawNetStartMenu(0);
 void presentation() 
 {
 
-  //sensor_node.begin(incomingMessage, NODE_ID);
-
-  // Send the sketch version information to the gateway and Controller
-sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER"."SKETCH_MINOR_VER);
-wait(RADIO_RESET_DELAY_TIME);
-
-present(CHILD_ID_CO2, S_AIR_QUALITY);
-wait(RADIO_RESET_DELAY_TIME);
 
 
-present(REBOOT_CHILD_ID, S_BINARY);
-wait(RADIO_RESET_DELAY_TIME);
 
 
-present(CHILD_ID_NIGHTMODE, S_BINARY);
-wait(RADIO_RESET_DELAY_TIME);
+
+					    iCount = MESSAGE_ACK_RETRY_COUNT;
+
+	                    while( !sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER"."SKETCH_MINOR_VER) && iCount > 0 )
+	                      {
+	                         wait(RADIO_RESET_DELAY_TIME);
+	                        iCount--;
+	                       }
+
+						wait(RADIO_RESET_DELAY_TIME);
 
 
-present(CHILD_ID_SPEAKER, S_BINARY);
-wait(RADIO_RESET_DELAY_TIME);
 
-present(CHILD_ID_ABC, S_BINARY);
-wait(RADIO_RESET_DELAY_TIME);
+					    iCount = MESSAGE_ACK_RETRY_COUNT;
+
+	                    while( !present(CHILD_ID_CO2, S_AIR_QUALITY, "CO2 level") && iCount > 0 )
+	                      {
+	                         wait(RADIO_RESET_DELAY_TIME);
+	                        iCount--;
+	                       }
+
+						wait(RADIO_RESET_DELAY_TIME);
 
 
-    request(CHILD_ID_SPEAKER, V_STATUS);
+
+					    iCount = MESSAGE_ACK_RETRY_COUNT;
+
+	                    while( !present(REBOOT_CHILD_ID, S_BINARY, "Reboot sensor") && iCount > 0 )
+	                      {
+	                         wait(RADIO_RESET_DELAY_TIME);
+	                        iCount--;
+	                       }
+
+						wait(RADIO_RESET_DELAY_TIME);
+
+
+					    iCount = MESSAGE_ACK_RETRY_COUNT;
+
+	                    while( !present(CHILD_ID_NIGHTMODE, S_BINARY, "Night mode") && iCount > 0 )
+	                      {
+	                         wait(RADIO_RESET_DELAY_TIME);
+	                        iCount--;
+	                       }
+
+						wait(RADIO_RESET_DELAY_TIME);
+
+
+					    iCount = MESSAGE_ACK_RETRY_COUNT;
+
+	                    while( !present(CHILD_ID_SPEAKER, S_BINARY, "Buzzer") && iCount > 0 )
+	                      {
+	                         wait(RADIO_RESET_DELAY_TIME);
+	                        iCount--;
+	                       }
+
+						wait(RADIO_RESET_DELAY_TIME);
+
+
+					    iCount = MESSAGE_ACK_RETRY_COUNT;
+
+	                    while( !present(CHILD_ID_ABC, S_BINARY, "ABC") && iCount > 0 )
+	                      {
+	                         wait(RADIO_RESET_DELAY_TIME);
+	                        iCount--;
+	                       }
+
+						wait(RADIO_RESET_DELAY_TIME);
+
+
+
+
+
+
+					    iCount = MESSAGE_ACK_RETRY_COUNT;
+
+	                    while( !request(CHILD_ID_SPEAKER, V_STATUS) && iCount > 0 )
+	                      {
+	                         wait(RADIO_RESET_DELAY_TIME);
+	                        iCount--;
+	                       }
+
+    
+					    iCount = MESSAGE_ACK_RETRY_COUNT;
+
+	                    while( !request(CHILD_ID_NIGHTMODE, V_STATUS) && iCount > 0 )
+	                      {
+	                         wait(RADIO_RESET_DELAY_TIME);
+	                        iCount--;
+	                       }
+
 
  
-    request(CHILD_ID_NIGHTMODE, V_STATUS);
+    
+
 
 
     //request(CHILD_ID_ABC, V_STATUS);
 
-
+if (configSettings.shortRestart != 1)
+{
   	wait(7000); 
-
+}
+else
+{
+	wait(2000);
+}
 
   	//Enable watchdog timer
   	wdt_enable(WDTO_8S); 
@@ -257,6 +326,8 @@ switch (bABCstate) {
 
   //u8g.setContrast(1);
 
+if (configSettings.shortRestart != 1)
+{
 
 	  	char bufi[9];
 
@@ -268,6 +339,10 @@ switch (bABCstate) {
 
 			}
 
+	    	configSettings.shortRestart = 0;
+	    	EEPROM_writeAnything(0, configSettings);  
+
+}
 
 
 
@@ -318,6 +393,17 @@ void getCO2Level()
 
 	  if ( !(response[0] == 0xFF && response[1] == 0x86 && response[8] == crc) ) {
 	    Serial.println("CRC error: " + String(crc) + " / "+ String(response[8]));
+	    bCRCcontErrors++;
+
+	    if ( bCRCcontErrors >= CRCCONTINOUSERRORS )
+	    {
+	    	configSettings.shortRestart = 1;
+	    	EEPROM_writeAnything(0, configSettings);  
+	    	bCRCcontErrors = 0;
+	    	 while(1) {                 
+              			};
+	    }
+
 	  } else {
 	    unsigned int responseHigh = (unsigned int) response[2];
 	    unsigned int responseLow = (unsigned int) response[3];
@@ -330,20 +416,20 @@ void getCO2Level()
 
 					    iCount = MESSAGE_ACK_RETRY_COUNT;
 
-	                    while( !gotAck && iCount > 0 )
+	                    while( !send(msgCO2.set(ppm,0)) && iCount > 0 )
 	                      {
-	            
-	                        send(msgCO2.set(ppm,0), true);
+
 	                         wait(RADIO_RESET_DELAY_TIME);
 	                        iCount--;
 	                       }
 
-	                      gotAck = false; 
+	                      //gotAck = false; 
 
 
 
 	drawMainScreen();
 
+	bCRCcontErrors = 0;
 
 	  }
 
@@ -862,11 +948,11 @@ void receive(const MyMessage &message)
 {
  // Handle incoming message 
 
-  if (message.isAck())
-  {
-    gotAck = true;
-    return;
-  }
+  //if (message.isAck())
+  //{
+  //  gotAck = true;
+  //  return;
+  //}
 
     if ( message.sensor == REBOOT_CHILD_ID && message.getBool() == true && strlen(message.getString())>0 ) {
     	   	  #ifdef NDEBUG      
@@ -927,15 +1013,14 @@ void receive(const MyMessage &message)
 
 					    iCount = MESSAGE_ACK_RETRY_COUNT;
 
-	                    while( !gotAck && iCount > 0 )
+	                    while( !send(msgBuzzerState.set(bSpeakerOff,0)) && iCount > 0 )
 	                      {
-	            
-	                        send(msgBuzzerState.set(bSpeakerOff,0), true);
-	                         wait(RADIO_RESET_DELAY_TIME);
+	                        
+	                        wait(RADIO_RESET_DELAY_TIME);
 	                        iCount--;
 	                       }
 
-	                      gotAck = false; 
+	                      //gotAck = false; 
 
      return;
      }
